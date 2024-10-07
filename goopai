@@ -1,0 +1,74 @@
+import discord
+import os
+import openai
+import traceback
+
+
+chat = ""
+
+
+openai.api_key = os.getenv("OPENAI_API_KEY")
+if openai.api_key is None:
+    print("Error: OpenAI API key not found.")
+    exit()
+
+
+token = os.getenv("SECRET_KEY")
+if token is None:
+    print("Error: Discord bot token not found.")
+    exit()
+
+
+class MyClient(discord.Client):
+    async def on_ready(self):
+        print(f'Logged on as {self.user}!')
+
+    async def on_message(self, message):
+        global chat
+        try:
+           
+            chat += f"{message.author}: {message.content}\n"
+            print(f'Message from {message.author}: {message.content}')
+
+           
+            if self.user != message.author:
+                if self.user in message.mentions:  
+                    messages = [
+                        {"role": "system", "content": "You are a helpful assistant."},
+                        {"role": "user", "content": chat}
+                    ]
+
+                  
+                    response = openai.ChatCompletion.create(
+                        model="gpt-4",  
+                        messages=messages,
+                        temperature=1,
+                        max_tokens=256,
+                        top_p=1,
+                        frequency_penalty=0,
+                        presence_penalty=0
+                    )
+
+                    
+                    message_to_send = response['choices'][0]['message']['content'].strip()
+
+                   
+                    await message.channel.send(message_to_send)
+
+        except Exception as e:
+            print(f"Error processing message: {e}")
+            traceback.print_exc()
+            chat = "" 
+
+
+intents = discord.Intents.default()
+intents.message_content = True
+
+
+client = MyClient(intents=intents)
+
+
+try:
+    client.run(token)
+except discord.errors.LoginFailure:
+    print("Error: Invalid Discord token.")
